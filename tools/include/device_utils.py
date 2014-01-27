@@ -206,6 +206,7 @@ def notify_and_pull_files(outfiles_prefixes,
                          "signal kw args must be non-null.")
 
     (master_pid, child_pids) = get_remote_b2g_pids()
+    child_pids = set(child_pids)
     old_files = _list_remote_temp_files(outfiles_prefixes)
 
     if signal != None:
@@ -233,6 +234,16 @@ def notify_and_pull_files(outfiles_prefixes,
             break
 
         sleep(wait_interval)
+
+        # Some pids may have gone away before reporting memory. This can happen
+        # normally if the triggering of memory reporting causes some old
+        # children to OOM. (Bug 931198)
+        dead_child_pids = child_pids - set(get_remote_b2g_pids()[1])
+        if len(dead_child_pids):
+            for pid in dead_child_pids:
+                print("\rWarning: Child %u exited during memory reporting" % pid)
+            child_pids -= dead_child_pids
+            num_expected_files -= len(outfiles_prefixes) * len(dead_child_pids)
 
     if len(new_files) < num_expected_files:
         print('')
